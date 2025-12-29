@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerUI;
@@ -11,17 +11,16 @@ namespace ResourceServer
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
+            // Add controller services
             builder.Services.AddControllers()
-            .AddJsonOptions(options =>
-            {
-                // This will use the property names as defined in the C# model
-                options.JsonSerializerOptions.PropertyNamingPolicy = null;
-            });
+                .AddJsonOptions(options =>
+                {
+                    // Keep C# property names as-is
+                    options.JsonSerializerOptions.PropertyNamingPolicy = null;
+                });
 
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            // Swagger configuration
             builder.Services.AddEndpointsApiExplorer();
-            //builder.Services.AddSwaggerGen();
             builder.Services.AddSwaggerGen(c =>
             {
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -35,45 +34,49 @@ namespace ResourceServer
                 });
 
                 c.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
-    });
-            });
-
-
-            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                    ValidateAudience = false,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
                     {
-                        var httpClient = new HttpClient();
-                        var jwks = httpClient.GetStringAsync(builder.Configuration["Jwt:JWKS"]).Result;
-                        var keys = new JsonWebKeySet(jwks).Keys;
-                        return keys;
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            }
+                        },
+                        Array.Empty<string>()
                     }
-                };
+                });
             });
+
+            // 🔹 JWT Authentication
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = builder.Configuration["Jwt:Issuer"], // MUST match JWT 'iss'
+                        ValidateAudience = false,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+
+                        IssuerSigningKeyResolver = (token, securityToken, kid, validationParameters) =>
+                        {
+                            var httpClient = new HttpClient();
+                            var jwksUrl = builder.Configuration["Jwt:JWKS"];
+                            var jwks = httpClient.GetStringAsync(jwksUrl).Result;
+                            return new JsonWebKeySet(jwks).Keys;
+                        }
+                    };
+                });
+
+            // Authorization middleware
+            builder.Services.AddAuthorization();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+            // Swagger middleware
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
@@ -85,8 +88,8 @@ namespace ResourceServer
 
             app.UseHttpsRedirection();
 
+            // Authentication & Authorization
             app.UseAuthentication();
-
             app.UseAuthorization();
 
             app.MapControllers();
