@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Swashbuckle.AspNetCore.SwaggerUI;
 
 namespace ResourceServer
 {
@@ -47,7 +48,10 @@ namespace ResourceServer
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
-                app.UseSwaggerUI();
+                app.UseSwaggerUI(options =>
+                {
+                    options.DocExpansion(DocExpansion.None);
+                });
             }
 
             app.UseHttpsRedirection();
